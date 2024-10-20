@@ -69,10 +69,20 @@ async function getMovieInfo(title) {
         const omdbResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdb_id}&apikey=${process.env.OMDB_API_KEY}`);
         const omdbMovie = omdbResponse.data;
 
-        // Verificar que la respuesta de OMDb es válida
+        // Verificar la respuesta de OMDb
+        console.log("Respuesta de OMDb:", omdbMovie); // Agregar log para depuración
+
+        // Verifica que la respuesta de OMDb es válida
         if (omdbMovie.Response === "False") {
             console.error('Error al obtener información de OMDb:', omdbMovie.Error);
             return null; // O puedes devolver un objeto vacío o con datos predeterminados
+        }
+
+        // Asegúrate de que el imdbID existe antes de continuar
+        let imdbID = omdbMovie.imdbID; // Cambié const a let
+        if (!imdbID) {
+            console.error('imdbID no encontrado en la respuesta de OMDb:', omdbMovie);
+            return null;
         }
 
         const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
@@ -82,7 +92,6 @@ async function getMovieInfo(title) {
         console.log("Géneros de la película:", movie.genre_ids); // Agregar log para depuración
 
          // Aquí generamos el link de Stremio usando el imdbID de OMDb
-         const imdbID = omdbMovie.imdbID; // Esto es el ID de IMDb que necesitas
          const stremioLink = generateStremioLink(imdbID); // Generar el enlace de Stremio
 
         return {
