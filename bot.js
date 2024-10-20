@@ -30,8 +30,10 @@ function generateLetterboxdLink(title) {
 // Función para generar un enlace de Stremio
 function generateStremioLink(title, imdbID) {
     const formattedTitle = title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, '-');
-    return `https://www.strem.io/s/movie/${formattedTitle}-${imdbID}`;
+    const cleanImdbID = imdbID.replace("tt", ""); // Elimina el prefijo "tt"
+    return `https://www.strem.io/s/movie/${formattedTitle}-${cleanImdbID}`;
 }
+
 
 // Cuando el bot esté listo
 client.once('ready', () => {
