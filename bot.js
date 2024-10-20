@@ -34,7 +34,6 @@ function generateStremioLink(title, imdbID) {
     return `https://www.strem.io/s/movie/${formattedTitle}-${cleanImdbID}`;
 }
 
-
 // Cuando el bot esté listo
 client.once('ready', () => {
     console.log('Bot is online!');
@@ -65,7 +64,7 @@ client.on('messageCreate', async message => {
             const letterboxdLink = generateLetterboxdLink(movieInfo.Title);
             const stremioLink = generateStremioLink(movieInfo.Title, movieInfo.imdbID);
             const moviePoster = movieInfo.Poster !== 'N/A' ? movieInfo.Poster : 'No disponible';
-            const movieTrailer = `https://www.youtube.com/results?search_query=${movieInfo.Title} trailer`;
+            const movieTrailer = movieInfo.Trailer || ''; // Obtén el enlace del tráiler directamente
 
             message.channel.send({
                 content: `**${movieInfo.Title}** (${movieInfo.Year})
@@ -74,8 +73,8 @@ client.on('messageCreate', async message => {
                 
                 **Enlaces:**
                 - [Ver en Letterboxd](${letterboxdLink})
-                - [Ver en Stremio](${stremioLink})
-                - [Ver Tráiler en YouTube](${movieTrailer})`,
+                - [Ver en Stremio](${stremioLink})${movieTrailer ? `\n- [Ver Tráiler en YouTube](${movieTrailer})` : ''}
+                `,
                 files: [moviePoster]  // Enviar la carátula de la película
             });
 
