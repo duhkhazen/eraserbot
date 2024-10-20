@@ -55,9 +55,15 @@ function generateLetterboxdLink(title) {
     return `https://letterboxd.com/film/${formattedTitle}/`;
 }
 
-// Función para generar un enlace de Stremio
 function generateStremioLink(imdbID) {
-    return `https://www.strem.io/s/movie/${imdbID.slice(2)}`; // Eliminar 'tt'
+    // Verificar si imdbID está definido y es una cadena
+    if (imdbID && typeof imdbID === 'string') {
+        // Eliminar el prefijo 'tt' si está presente
+        return `https://www.stremio.com/open?imdb_id=${imdbID.slice(2)}`;
+    } else {
+        console.error('imdbID no es válido:', imdbID);
+        return 'Enlace de Stremio no disponible'; // O algún mensaje por defecto
+    }
 }
 
 // Función para construir la estructura de respuesta en embed
