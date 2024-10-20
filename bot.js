@@ -70,13 +70,13 @@ function buildResponse(movieInfo) {
         content: `**${movieInfo.title}** (${movieInfo.year})
         Género: ${movieInfo.genre}
         Sinopsis: ${movieInfo.plot}
-        Directores: ${movieInfo.directors}
+        Director/a: ${movieInfo.directors}
         Calificación en IMDb: ${movieInfo.imdbRating}
         
         **Enlaces:**
-        - [Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})
-        - [Ver en Stremio](${generateStremioLink(movieInfo.imdb_id)})
-        - [Ver Tráiler en YouTube](${movieInfo.trailer})`,
+        - Ver en Letterboxd: ${generateLetterboxdLink(movieInfo.title)}
+        - Ver en Stremio: ${generateStremioLink(movieInfo.imdb_id)}
+        - [Ver Tráiler en YouTube](${movieInfo.trailer})`, // Mantener el link del trailer como inserción
         files: [movieInfo.poster]  // Enviar la carátula de la película
     };
 }
