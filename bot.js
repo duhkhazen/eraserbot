@@ -14,6 +14,34 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 let genresList = [];
 let watchlist = [];
 
+// Mapeo estático de los géneros
+const genreMapping = {
+    28: 'Action',
+    12: 'Adventure',
+    16: 'Animation',
+    35: 'Comedy',
+    80: 'Crime',
+    99: 'Documentary',
+    18: 'Drama',
+    10751: 'Family',
+    14: 'Fantasy',
+    36: 'History',
+    27: 'Horror',
+    10402: 'Music',
+    9648: 'Mystery',
+    10749: 'Romance',
+    878: 'Science Fiction',
+    10770: 'TV Movie',
+    53: 'Thriller',
+    10752: 'War',
+    37: 'Western'
+};
+
+// Función para obtener el nombre del género basado en su código
+function getGenreNameById(genreId) {
+    return genreMapping[genreId] || 'Unknown Genre';
+}
+
 // Función para obtener información de una película de TMDB
 async function getMovieInfo(title) {
     try {
@@ -26,22 +54,27 @@ async function getMovieInfo(title) {
             return null;
         }
 
+        // Obtener más detalles de la película desde OMDb usando el imdbID
+        const omdbResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdb_id}&apikey=${OMDB_API_KEY}`);
+        const omdbMovie = omdbResponse.data;
+        console.log("Respuesta de OMDb:", omdbMovie); // Log para depuración
+
         const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
         const trailers = trailerResponse.data.results;
 
-        console.log("Géneros de la película:", movie.genres); // Agregar log para depuración
+        console.log("Géneros de la película:", movie.genre_ids); // Agregar log para depuración
 
         return {
             title: movie.title,
             year: new Date(movie.release_date).getFullYear(),
-            genre: movie.genres && movie.genres.length > 0 ? movie.genres.map(genre => genre.name).join(', ') : 'No disponible',
+            genre: movie.genre_ids && movie.genre_ids.length > 0 ? movie.genre_ids.map(id => getGenreNameById(id)).join(', ') : 'No disponible',
             plot: movie.overview,
             poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'No disponible',
             imdbRating: movie.vote_average,
             directors: creditsResponse.data.crew.filter(member => member.job === 'Director').map(director => director.name).join(', '),
             trailer: trailers.length > 0 ? `https://www.youtube.com/watch?v=${trailers[0].key}` : 'No disponible',
-            imdb_id: movie.id // Usar el ID de TMDB para OMDb
+            imdb_id: omdbMovie.imdbID
         };
     } catch (error) {
         console.error('Error al obtener la información de TMDB:', error);
@@ -72,24 +105,14 @@ function buildEmbedResponse(movieInfo) {
         .setColor(0x0099FF)
         .setTitle(movieInfo.title)
         .setDescription(`**Año:** ${movieInfo.year}\n**Género:** ${movieInfo.genre}\n**Sinopsis:** ${movieInfo.plot}\n**Directores:** ${movieInfo.directors}\n**Calificación en IMDb:** ${movieInfo.imdbRating}`)
-        .setImage(movieInfo.poster)
+        .setThumbnail(movieInfo.poster) // Añadir la carátula a la derecha como miniatura
         .addFields(
-            { name: 'Enlaces', value: `[Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})\n[Ver en Stremio](${generateStremioLink(movieInfo.imdb_id)})\n[Ver Tráiler en YouTube](${movieInfo.trailer})` }
+            { name: 'Enlaces', value: `[Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})\n[Ver en Stremio](${generateStremioLink(movieInfo.imdb_id)})` }
         )
         .setTimestamp()
-        .setFooter({ text: '¡Disfruta de la película!' });
+        .setFooter({ text: `🎬 Tráiler: ${movieInfo.trailer}` }); // Añadir el tráiler en el footer
 
     return embed;
-}
-
-// Función para cargar la lista de géneros al iniciar el bot
-async function loadGenres() {
-    try {
-        const response = await axios.get(`https://api.themoviedb.org/3/genre/movie/list?api_key=${TMDB_API_KEY}`);
-        genresList = response.data.genres;
-    } catch (error) {
-        console.error('Error al obtener la lista de géneros:', error);
-    }
 }
 
 // Cuando el bot esté listo
