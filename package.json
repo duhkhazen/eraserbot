@@ -1,0 +1,13 @@
+{
+  "name": "discord-movie-bot",
+  "version": "1.0.0",
+  "description": "A bot to recommend movies and provide links to Letterboxd and Stremio",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.0.0",
+    "axios": "^0.21.1"
+  }
+}
