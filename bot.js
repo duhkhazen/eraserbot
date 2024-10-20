@@ -18,14 +18,19 @@ async function getMovieInfo(title) {
             return null;
         }
         const movie = searchResponse.data.results[0];
+        
+        // Verifica si la película tiene géneros
+        const genres = movie.genres ? movie.genres.map(genre => genre.name).join(', ') : 'No disponible';
+        
         const videoResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
         const trailer = videoResponse.data.results.find(video => video.type === 'Trailer');
+        
         return {
             title: movie.title,
-            year: movie.release_date.split('-')[0],
-            genre: movie.genres.map(genre => genre.name).join(', '),
-            synopsis: movie.overview,
-            poster: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+            year: movie.release_date ? movie.release_date.split('-')[0] : 'No disponible',
+            genre: genres,
+            synopsis: movie.overview || 'No disponible',
+            poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'No disponible',
             trailer: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : 'No disponible',
         };
     } catch (error) {
