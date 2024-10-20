@@ -68,13 +68,22 @@ async function getMovieInfo(title) {
         // Obtener más detalles de la película desde OMDb usando el imdbID
         const omdbResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdb_id}&apikey=${process.env.OMDB_API_KEY}`);
         const omdbMovie = omdbResponse.data;
-        console.log("Respuesta de OMDb:", omdbMovie); // Log para depuración
+
+        // Verificar que la respuesta de OMDb es válida
+        if (omdbMovie.Response === "False") {
+            console.error('Error al obtener información de OMDb:', omdbMovie.Error);
+            return null; // O puedes devolver un objeto vacío o con datos predeterminados
+        }
 
         const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
         const trailers = trailerResponse.data.results;
 
         console.log("Géneros de la película:", movie.genre_ids); // Agregar log para depuración
+
+         // Aquí generamos el link de Stremio usando el imdbID de OMDb
+         const imdbID = omdbMovie.imdbID; // Esto es el ID de IMDb que necesitas
+         const stremioLink = generateStremioLink(imdbID); // Generar el enlace de Stremio
 
         return {
             title: movie.title,
@@ -85,7 +94,8 @@ async function getMovieInfo(title) {
             imdbRating: movie.vote_average,
             directors: creditsResponse.data.crew.filter(member => member.job === 'Director').map(director => director.name).join(', '),
             trailer: trailers.length > 0 ? trailers[0].key : 'No disponible', // Guardar solo el key del tráiler
-            imdb_id: omdbMovie.imdbID
+            imdb_id: imdbID || 'No disponible', // Asegúrate de que se asigna correctamente
+            stremioLink: stremioLink // Añadir el enlace de Stremio a la respuesta
         };
     } catch (error) {
         console.error('Error al obtener la información de TMDB:', error);
@@ -99,11 +109,12 @@ function generateLetterboxdLink(title) {
     return `https://letterboxd.com/film/${formattedTitle}/`;
 }
 
+// Función para generar un enlace de Stremio
 function generateStremioLink(imdbID) {
-    // Verificar si imdbID está definido y es una cadena
-    if (imdbID && typeof imdbID === 'string') {
-        // Eliminar el prefijo 'tt' si está presente
-        return `https://www.stremio.com/open?imdb_id=${imdbID.slice(2)}`;
+    // Eliminar el prefijo 'tt' si está presente
+    if (imdbID) {
+        const stremioID = imdbID.replace('tt', ''); // Eliminar 'tt'
+        return `https://www.strem.io/s/movie/${stremioID}`;
     } else {
         console.error('imdbID no es válido:', imdbID);
         return 'Enlace de Stremio no disponible'; // O algún mensaje por defecto
