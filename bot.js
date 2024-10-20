@@ -15,6 +15,29 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const watchlist = [];
 const rankings = {};
 
+// Mapeo de géneros
+const genres = {
+    28: 'Acción',
+    12: 'Aventura',
+    16: 'Animación',
+    35: 'Comedia',
+    80: 'Crimen',
+    99: 'Documental',
+    18: 'Drama',
+    10751: 'Familiar',
+    14: 'Fantasía',
+    36: 'Historia',
+    27: 'Terror',
+    10402: 'Música',
+    9648: 'Misterio',
+    10749: 'Romance',
+    878: 'Ciencia ficción',
+    10770: 'Película de televisión',
+    53: 'Suspenso',
+    10752: 'Guerra',
+    37: 'Western',
+};
+
 // Función para obtener información de una película de TMDB y OMDb
 async function getMovieInfo(title) {
     try {
@@ -39,7 +62,7 @@ async function getMovieInfo(title) {
         return {
             title: movieInfo.title,
             year: movieInfo.release_date.split('-')[0],
-            genre: movieInfo.genre_ids.map(id => genres[id] || 'Desconocido').join(', '), // Asegúrate de mapear correctamente los IDs de género
+            genre: movieInfo.genre_ids.map(id => genres[id] || 'Desconocido').join(', '), // Mapea los IDs de género
             plot: omdbData.Plot,
             poster: movieInfo.poster_path ? `https://image.tmdb.org/t/p/w500${movieInfo.poster_path}` : 'No disponible',
             imdbID,
@@ -194,22 +217,22 @@ client.on('messageCreate', async message => {
                 - [Ver Tráiler](${movieTrailer})`,
                 files: [moviePoster]
             });
-
         } catch (error) {
             console.error('Error al obtener la información de la película:', error);
-            message.channel.send('Hubo un error al intentar obtener la información de la película.');
+            message.channel.send('Hubo un error al obtener la información de la película.');
         }
     }
 
     // Comando para recomendar una película al azar
     if (message.content.startsWith('!random')) {
-        await recommendRandomMovie(message);
-    }
+        const args = message.content.split(' ').slice(1);
+        const genre = args[0] ? args[0] : null;
 
-    // Comando para recomendar una película por género
-    if (message.content.startsWith('!random ')) {
-        const genre = message.content.split(' ').slice(1).join(' ');
-        await recommendByGenre(message, genre);
+        if (genre) {
+            await recommendByGenre(message, genre);
+        } else {
+            await recommendRandomMovie(message);
+        }
     }
 
     // Comando para agregar a la watchlist
@@ -269,3 +292,4 @@ client.on('messageCreate', async message => {
 
 // Inicia el bot
 client.login(DISCORD_BOT_TOKEN);
+
