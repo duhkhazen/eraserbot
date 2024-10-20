@@ -17,9 +17,11 @@ let genresList = [];
 async function getMovieInfo(title) {
     try {
         const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
+        console.log("Respuesta de TMDB:", response.data); // Agregar log para depuración
         const movie = response.data.results[0];
 
         if (!movie) {
+            console.log("No se encontró ninguna película.");
             return null;
         }
 
@@ -27,12 +29,15 @@ async function getMovieInfo(title) {
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
         const trailers = trailerResponse.data.results;
 
+        // Verifica si movie.genres está disponible
+        console.log("Géneros de la película:", movie.genres); // Agregar log para depuración
+
         return {
             title: movie.title,
             year: new Date(movie.release_date).getFullYear(),
-            genre: movie.genres.map(genre => genre.name).join(', '),
+            genre: movie.genres && movie.genres.length > 0 ? movie.genres.map(genre => genre.name).join(', ') : 'No disponible',
             plot: movie.overview,
-            poster: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+            poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'No disponible',
             imdbRating: movie.vote_average,
             directors: creditsResponse.data.crew.filter(member => member.job === 'Director').map(director => director.name).join(', '),
             trailer: trailers.length > 0 ? `https://www.youtube.com/watch?v=${trailers[0].key}` : 'No disponible',
