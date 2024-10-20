@@ -13,8 +13,8 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 // Función para obtener información de una película de TMDB
 async function getMovieInfo(title) {
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
-        return response.data.results[0]; // Devuelve la primera película que coincida
+        const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}&language=es-ES`);
+        return response.data;
     } catch (error) {
         console.error('Error al obtener la información de TMDB:', error);
         return null;
@@ -28,9 +28,9 @@ function generateLetterboxdLink(title) {
 }
 
 // Función para generar un enlace de Stremio
-function generateStremioLink(title, tmdbID) {
+function generateStremioLink(title, imdbID) {
     const formattedTitle = title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, '-');
-    return `https://www.strem.io/s/movie/${formattedTitle}-${tmdbID}`;
+    return `https://www.strem.io/s/movie/${formattedTitle}-${imdbID.slice(2)}`; // Eliminamos el prefijo "tt"
 }
 
 // Cuando el bot esté listo
@@ -42,46 +42,49 @@ client.once('ready', () => {
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
-    // Comando para obtener información de una película
-    if (message.content.startsWith('/info')) {
+    // Comando para obtener información de la película
+    if (message.content.startsWith('!info')) {
         const args = message.content.split(' ').slice(1);
         const movieTitle = args.join(' ');
 
         if (!movieTitle) {
-            message.channel.send('Por favor, proporciona el título de una película. Ejemplo: /info Inception');
+            message.channel.send('Por favor, proporciona el título de una película. Ejemplo: !info Inception');
             return;
         }
 
         try {
-            const movieInfo = await getMovieInfo(movieTitle);
+            const movieData = await getMovieInfo(movieTitle);
 
-            if (!movieInfo) {
+            if (!movieData || movieData.results.length === 0) {
                 message.channel.send('No se encontró información de esa película.');
                 return;
             }
 
-            const letterboxdLink = generateLetterboxdLink(movieInfo.original_title);
-            const stremioLink = generateStremioLink(movieInfo.original_title, movieInfo.id);
+            const movieInfo = movieData.results[0];
+            const letterboxdLink = generateLetterboxdLink(movieInfo.title);
+            const stremioLink = generateStremioLink(movieInfo.title, movieInfo.imdb_id);
             const moviePoster = movieInfo.poster_path ? `https://image.tmdb.org/t/p/w500${movieInfo.poster_path}` : 'No disponible';
-            const trailerLink = movieInfo.trailer ? movieInfo.trailer : 'No disponible'; // Aquí puedes ajustar para obtener el trailer de otra API
+            const trailer = movieInfo.video ? `https://www.youtube.com/watch?v=${movieInfo.video}` : 'No disponible';
 
             message.channel.send({
-                content: `**${movieInfo.original_title}** (${movieInfo.release_date.split('-')[0]})
-                Género: ${movieInfo.genre_ids.map(id => `Género ${id}`).join(', ')}
+                content: `**${movieInfo.title}** (${movieInfo.release_date ? movieInfo.release_date.split('-')[0] : 'N/A'})
+                Género: ${movieInfo.genres.map(genre => genre.name).join(', ')}
                 Sinopsis: ${movieInfo.overview}
-                
+
                 **Enlaces:**
                 - [Ver en Letterboxd](${letterboxdLink})
                 - [Ver en Stremio](${stremioLink})
-                ${trailerLink !== 'No disponible' ? `- [Ver Tráiler](${trailerLink})` : ''}`,
+                - [Ver Tráiler](${trailer})`,
                 files: [moviePoster]  // Enviar la carátula de la película
             });
 
         } catch (error) {
             console.error('Error al obtener la información de la película:', error);
-            message.channel.send('Hubo un error al intentar obtener información de la película.');
+            message.channel.send('Hubo un error al intentar recomendar una película.');
         }
     }
+
+    // Aquí podrías agregar los comandos adicionales para random, fun, etc.
 });
 
 // Inicia el bot
