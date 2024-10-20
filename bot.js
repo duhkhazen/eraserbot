@@ -10,8 +10,9 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
-// Almacena los géneros de películas en memoria
+// Almacena los géneros de películas y la lista de seguimiento en memoria
 let genresList = [];
+let watchlist = [];
 
 // Función para obtener información de una película de TMDB
 async function getMovieInfo(title) {
@@ -29,7 +30,6 @@ async function getMovieInfo(title) {
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
         const trailers = trailerResponse.data.results;
 
-        // Verifica si movie.genres está disponible
         console.log("Géneros de la película:", movie.genres); // Agregar log para depuración
 
         return {
@@ -174,6 +174,53 @@ client.on('messageCreate', async message => {
         } catch (error) {
             console.error('Error al obtener una película aleatoria por género:', error);
             message.channel.send('Hubo un error al intentar obtener una película aleatoria por género.');
+        }
+    }
+
+    // Comando para agregar una película a la lista de seguimiento
+    if (message.content.startsWith('!add ')) {
+        const args = message.content.split(' ').slice(1);
+        const movieTitle = args.join(' ');
+
+        if (!movieTitle) {
+            message.channel.send('Por favor, proporciona el título de una película para agregar a la lista de seguimiento.');
+            return;
+        }
+
+        const movieInfo = await getMovieInfo(movieTitle);
+        if (movieInfo) {
+            watchlist.push(movieInfo.title);
+            message.channel.send(`La película "${movieInfo.title}" ha sido agregada a tu lista de seguimiento.`);
+        } else {
+            message.channel.send('No se encontró información de esa película.');
+        }
+    }
+
+    // Comando para mostrar la lista de seguimiento
+    if (message.content.startsWith('!watchlist')) {
+        if (watchlist.length === 0) {
+            message.channel.send('Tu lista de seguimiento está vacía.');
+        } else {
+            message.channel.send(`Tu lista de seguimiento:\n${watchlist.join('\n')}`);
+        }
+    }
+
+    // Comando para clasificar una película
+    if (message.content.startsWith('!rank ')) {
+        const args = message.content.split(' ').slice(1);
+        const movieTitle = args.join(' ');
+
+        if (!movieTitle) {
+            message.channel.send('Por favor, proporciona el título de una película para clasificar.');
+            return;
+        }
+
+        const movieInfo = await getMovieInfo(movieTitle);
+        if (movieInfo) {
+            // Lógica para clasificar la película (se puede mejorar)
+            message.channel.send(`Has clasificado "${movieInfo.title}". ¡Gracias por tu opinión!`);
+        } else {
+            message.channel.send('No se encontró información de esa película.');
         }
     }
 
