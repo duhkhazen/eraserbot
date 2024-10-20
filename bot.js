@@ -17,11 +17,12 @@ let genresList = [];
 async function getMovieInfo(title) {
     try {
         const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
-        const movie = response.data.results[0];
-
-        if (!movie) {
-            return null;
+        
+        if (response.data.results.length === 0) {
+            return null; // No se encontraron resultados
         }
+
+        const movie = response.data.results[0];
 
         const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
@@ -30,7 +31,7 @@ async function getMovieInfo(title) {
         return {
             title: movie.title,
             year: new Date(movie.release_date).getFullYear(),
-            genre: movie.genres.map(genre => genre.name).join(', '), // Asegurarse de que los géneros se obtengan correctamente
+            genre: movie.genre_ids.map(id => genresList.find(g => g.id === id).name).join(', '), // Obtener los nombres de los géneros
             plot: movie.overview,
             poster: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
             imdbRating: movie.vote_average,
