@@ -1,81 +1,42 @@
+// Importa los módulos necesarios
 const axios = require('axios');
 const { Client, GatewayIntentBits } = require('discord.js');
 require('dotenv').config(); // Carga las variables de entorno desde el archivo .env
 
+// Crea una instancia del cliente de Discord
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
+// Obtén las claves API de las variables de entorno
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
-const OMDB_API_KEY = process.env.OMDB_API_KEY;
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
-const watchlist = [];
-const rankings = {};
+// Almacena los géneros de películas en memoria
+let genresList = [];
 
-// Mapeo de géneros
-const genres = {
-    28: 'Acción',
-    12: 'Aventura',
-    16: 'Animación',
-    35: 'Comedia',
-    80: 'Crimen',
-    99: 'Documental',
-    18: 'Drama',
-    10751: 'Familiar',
-    14: 'Fantasía',
-    36: 'Historia',
-    27: 'Terror',
-    10402: 'Música',
-    9648: 'Misterio',
-    10749: 'Romance',
-    878: 'Ciencia ficción',
-    10770: 'Película de televisión',
-    53: 'Suspenso',
-    10752: 'Guerra',
-    37: 'Western',
-};
-
-// Función para obtener información de una película de TMDB y OMDb
+// Función para obtener información de una película de TMDB
 async function getMovieInfo(title) {
     try {
-        const tmdbResponse = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
-        const movieData = tmdbResponse.data.results;
+        const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
+        const movie = response.data.results[0];
 
-        if (movieData.length === 0) {
+        if (!movie) {
             return null;
         }
 
-        const movieInfo = movieData[0]; // Obtiene la primera película
-        const year = movieInfo.release_date ? movieInfo.release_date.split('-')[0] : null;
-
-        const omdbResponse = await axios.get(`http://www.omdbapi.com/?t=${encodeURIComponent(movieInfo.title)}&y=${year}&apikey=${OMDB_API_KEY}`);
-        const omdbData = omdbResponse.data;
-
-        if (omdbData.Response === 'False') {
-            return null;
-        }
-
-        const imdbID = omdbData.imdbID.slice(2); // Remueve el prefijo 'tt'
-
-        // Obtener el tráiler de TMDB
-        const videoResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movieInfo.id}/videos?api_key=${TMDB_API_KEY}`);
-        const trailer = videoResponse.data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube'); // Obtener el tráiler de YouTube
-
-        // Obtener directores y elenco principal
-        const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movieInfo.id}/credits?api_key=${TMDB_API_KEY}`);
-        const directors = creditsResponse.data.crew.filter(person => person.job === 'Director').map(director => director.name).join(', ');
-        const cast = creditsResponse.data.cast.slice(0, 5).map(actor => actor.name).join(', ');
+        const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
+        const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
+        const trailers = trailerResponse.data.results;
 
         return {
-            title: movieInfo.title,
-            year: movieInfo.release_date.split('-')[0],
-            genre: movieInfo.genre_ids.map(id => genres[id] || 'Desconocido').join(', '),
-            plot: omdbData.Plot,
-            poster: movieInfo.poster_path ? `https://image.tmdb.org/t/p/w500${movieInfo.poster_path}` : 'No disponible',
-            imdbID,
-            imdbRating: omdbData.imdbRating,
-            directors,
-            cast,
-            trailer: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : 'No disponible',
+            title: movie.title,
+            year: new Date(movie.release_date).getFullYear(),
+            genre: movie.genres.map(genre => genre.name).join(', '), // Asegurarse de que los géneros se obtengan correctamente
+            plot: movie.overview,
+            poster: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+            imdbRating: movie.vote_average,
+            directors: creditsResponse.data.crew.filter(member => member.job === 'Director').map(director => director.name).join(', '),
+            trailer: trailers.length > 0 ? `https://www.youtube.com/watch?v=${trailers[0].key}` : 'No disponible',
+            imdb_id: movie.imdb_id // Guardar el ID de IMDb para el enlace de Stremio
         };
     } catch (error) {
         console.error('Error al obtener la información de TMDB:', error);
@@ -91,32 +52,47 @@ function generateLetterboxdLink(title) {
 
 // Función para generar un enlace de Stremio
 function generateStremioLink(imdbID) {
-    return `https://www.strem.io/s/movie/${imdbID}`;
+    return `https://www.strem.io/s/movie/${imdbID.slice(2)}`; // Eliminar 'tt'
 }
 
-// Función para obtener una película al azar
-async function getRandomMovie(genre) {
+// Función para construir la estructura de respuesta
+function buildResponse(movieInfo) {
+    return {
+        content: `**${movieInfo.title}** (${movieInfo.year})
+        Género: ${movieInfo.genre}
+        Sinopsis: ${movieInfo.plot}
+        Directores: ${movieInfo.directors}
+        Calificación en IMDb: ${movieInfo.imdbRating}
+        
+        **Enlaces:**
+        - [Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})
+        - [Ver en Stremio](${generateStremioLink(movieInfo.imdb_id)})
+        - [Ver Tráiler en YouTube](${movieInfo.trailer})`,
+        files: [movieInfo.poster]  // Enviar la carátula de la película
+    };
+}
+
+// Función para cargar la lista de géneros al iniciar el bot
+async function loadGenres() {
     try {
-        const genreQuery = genre ? `&with_genres=${genre}` : '';
-        const tmdbResponse = await axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}${genreQuery}&sort_by=popularity.desc`);
-        const randomIndex = Math.floor(Math.random() * tmdbResponse.data.results.length);
-        return tmdbResponse.data.results[randomIndex];
+        const response = await axios.get(`https://api.themoviedb.org/3/genre/movie/list?api_key=${TMDB_API_KEY}`);
+        genresList = response.data.genres;
     } catch (error) {
-        console.error('Error al obtener película aleatoria de TMDB:', error);
-        return null;
+        console.error('Error al obtener la lista de géneros:', error);
     }
 }
 
 // Cuando el bot esté listo
-client.once('ready', () => {
+client.once('ready', async () => {
     console.log('Bot is online!');
+    await loadGenres(); // Cargar la lista de géneros al iniciar
 });
 
-// Comando para obtener información de una película
+// Cuando se envíe un mensaje en el servidor
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
-    // Comando !info para obtener detalles de una película
+    // Comando para obtener información de una película
     if (message.content.startsWith('!info')) {
         const args = message.content.split(' ').slice(1);
         const movieTitle = args.join(' ');
@@ -134,111 +110,72 @@ client.on('messageCreate', async message => {
                 return;
             }
 
-            const letterboxdLink = generateLetterboxdLink(movieInfo.title);
-            const stremioLink = generateStremioLink(movieInfo.imdbID);
-            const moviePoster = movieInfo.poster || 'No disponible';
-            const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `No hay tráiler disponible`;
-
-            await message.channel.send({
-                content: `**${movieInfo.title}** (${movieInfo.year})
-                Género: ${movieInfo.genre}
-                Sinopsis: ${movieInfo.plot}
-                **Directores:** ${movieInfo.directors}
-                **Elenco Principal:** ${movieInfo.cast}
-                **Puntuación IMDb:** ${movieInfo.imdbRating}
-                
-                **Enlaces:**
-                - [Ver en Letterboxd](${letterboxdLink})
-                - [Ver en Stremio](${stremioLink})
-                - [Ver Tráiler](${movieTrailer})`,
-                files: [moviePoster]
-            });
+            message.channel.send(buildResponse(movieInfo));
         } catch (error) {
             console.error('Error al obtener la información de la película:', error);
-            message.channel.send('Hubo un error al obtener la información de la película.');
+            message.channel.send('Hubo un error al intentar obtener la información de la película.');
         }
     }
 
-    // Comando !random para obtener una película al azar
+    // Comando para recomendar una película al azar
     if (message.content.startsWith('!random')) {
-        const args = message.content.split(' ').slice(1);
-        const genre = args.join(' ');
-
         try {
-            const randomMovie = await getRandomMovie(genre);
+            const randomResponse = await axios.get(`https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}`);
+            const randomMovie = randomResponse.data.results[Math.floor(Math.random() * randomResponse.data.results.length)];
+            const movieInfo = await getMovieInfo(randomMovie.title);
 
-            if (!randomMovie) {
-                message.channel.send('No se encontró una película al azar.');
+            if (!movieInfo) {
+                message.channel.send('No se encontró información de esa película.');
                 return;
             }
 
-            const letterboxdLink = generateLetterboxdLink(randomMovie.title);
-            const stremioLink = generateStremioLink(randomMovie.imdbID);
-
-            await message.channel.send({
-                content: `Película al azar: **${randomMovie.title}** (${randomMovie.release_date.split('-')[0]})
-                Género: ${randomMovie.genre_ids.map(id => genres[id] || 'Desconocido').join(', ')}
-                - [Ver en Letterboxd](${letterboxdLink})
-                - [Ver en Stremio](${stremioLink})`,
-            });
+            message.channel.send(buildResponse(movieInfo));
         } catch (error) {
-            console.error('Error al obtener la película aleatoria:', error);
-            message.channel.send('Hubo un error al obtener la película aleatoria.');
+            console.error('Error al obtener una película aleatoria:', error);
+            message.channel.send('Hubo un error al intentar obtener una película aleatoria.');
         }
     }
 
-    // Comando !watchlist para agregar una película a la watchlist
-    if (message.content.startsWith('!addtowatchlist')) {
-        const movieTitle = message.content.split(' ').slice(1).join(' ');
+    // Comando para recomendar una película por género
+    if (message.content.startsWith('!random ')) {
+        const args = message.content.split(' ').slice(1);
+        const genre = args.join(' ');
 
-        if (!movieTitle) {
-            message.channel.send('Por favor, proporciona el título de una película. Ejemplo: !addtowatchlist Inception');
+        if (!genre) {
+            message.channel.send('Por favor, proporciona un género. Ejemplo: !random Action');
             return;
         }
 
-        if (!watchlist.includes(movieTitle)) {
-            watchlist.push(movieTitle);
-            message.channel.send(`Película **${movieTitle}** agregada a la watchlist.`);
-        } else {
-            message.channel.send('Esa película ya está en la watchlist.');
-        }
-    }
+        const genreId = genresList.find(g => g.name.toLowerCase() === genre.toLowerCase());
 
-    // Comando !viewwatchlist para ver la lista de películas pendientes
-    if (message.content.startsWith('!viewwatchlist')) {
-        if (watchlist.length === 0) {
-            message.channel.send('La watchlist está vacía.');
-        } else {
-            message.channel.send(`Watchlist:\n- ${watchlist.join('\n- ')}`);
-        }
-    }
-
-    // Comando !rankmovie para clasificar una película
-    if (message.content.startsWith('!rankmovie')) {
-        const args = message.content.split(' ');
-        const movieTitle = args.slice(1, -1).join(' ');
-        const rank = parseInt(args[args.length - 1], 10);
-
-        if (!movieTitle || isNaN(rank) || rank < 1 || rank > 10) {
-            message.channel.send('Por favor, proporciona un título de película y una clasificación entre 1 y 10. Ejemplo: !rankmovie Inception 9');
+        if (!genreId) {
+            message.channel.send('No se encontró el género especificado.');
             return;
         }
 
-        rankings[movieTitle] = rank;
-        message.channel.send(`Has clasificado la película **${movieTitle}** con un ${rank}/10.`);
+        try {
+            const randomGenreResponse = await axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${genreId.id}`);
+            const randomMovie = randomGenreResponse.data.results[Math.floor(Math.random() * randomGenreResponse.data.results.length)];
+            const movieInfo = await getMovieInfo(randomMovie.title);
+
+            if (!movieInfo) {
+                message.channel.send('No se encontró información de esa película.');
+                return;
+            }
+
+            message.channel.send(buildResponse(movieInfo));
+        } catch (error) {
+            console.error('Error al obtener una película aleatoria por género:', error);
+            message.channel.send('Hubo un error al intentar obtener una película aleatoria por género.');
+        }
     }
 
-    // Comando !viewrankings para ver el ranking de películas
-    if (message.content.startsWith('!viewrankings')) {
-        if (Object.keys(rankings).length === 0) {
-            message.channel.send('No hay películas clasificadas aún.');
-        } else {
-            const rankingsList = Object.entries(rankings)
-                .map(([movie, rank]) => `- ${movie}: ${rank}/10`)
-                .join('\n');
-            message.channel.send(`Rankings de películas:\n${rankingsList}`);
-        }
+    // Comando para iniciar un juego de adivinar la película
+    if (message.content.startsWith('!fun')) {
+        // Lógica para el juego de adivinar la película (no implementada en este código)
+        message.channel.send('¡Juego de adivinar la película aún no implementado!');
     }
 });
 
+// Inicia el bot
 client.login(DISCORD_BOT_TOKEN);
