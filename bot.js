@@ -30,8 +30,7 @@ function generateLetterboxdLink(title) {
 // Función para generar un enlace de Stremio
 function generateStremioLink(title, imdbID) {
     const formattedTitle = title.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, '-');
-    const cleanImdbID = imdbID.replace("tt", ""); // Elimina el prefijo "tt"
-    return `https://www.strem.io/s/movie/${formattedTitle}-${cleanImdbID}`;
+    return `https://www.strem.io/s/movie/${formattedTitle}-${imdbID}`;
 }
 
 // Cuando el bot esté listo
@@ -64,7 +63,7 @@ client.on('messageCreate', async message => {
             const letterboxdLink = generateLetterboxdLink(movieInfo.Title);
             const stremioLink = generateStremioLink(movieInfo.Title, movieInfo.imdbID);
             const moviePoster = movieInfo.Poster !== 'N/A' ? movieInfo.Poster : 'No disponible';
-            const movieTrailer = movieInfo.Trailer || ''; // Obtén el enlace del tráiler directamente
+            const movieTrailer = movieInfo.Trailer || 'No disponible'; // Usa el trailer directamente desde la API
 
             message.channel.send({
                 content: `**${movieInfo.Title}** (${movieInfo.Year})
@@ -73,8 +72,8 @@ client.on('messageCreate', async message => {
                 
                 **Enlaces:**
                 - [Ver en Letterboxd](${letterboxdLink})
-                - [Ver en Stremio](${stremioLink})${movieTrailer ? `\n- [Ver Tráiler en YouTube](${movieTrailer})` : ''}
-                `,
+                - [Ver en Stremio](${stremioLink})
+                - [Ver Tráiler](${movieTrailer})`,
                 files: [moviePoster]  // Enviar la carátula de la película
             });
 
