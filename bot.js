@@ -116,8 +116,8 @@ async function recommendRandomMovie(message) {
             
             **Enlaces:**
             - [Ver en Letterboxd](${letterboxdLink})
-            - [Ver en Stremio](${stremioLink})
-            - [Ver Tráiler](${movieTrailer})`,
+            [Ver en Stremio](${stremioLink})
+            (${movieTrailer})`,
             files: [moviePoster]
         });
     } catch (error) {
@@ -152,8 +152,8 @@ async function recommendByGenre(message, genre) {
             
             **Enlaces:**
             - [Ver en Letterboxd](${letterboxdLink})
-            - [Ver en Stremio](${stremioLink})
-            - [Ver Tráiler](${movieTrailer})`,
+            [Ver en Stremio](${stremioLink})
+            (${movieTrailer})`,
             files: [moviePoster]
         });
     } catch (error) {
@@ -218,8 +218,8 @@ client.on('messageCreate', async message => {
                 
                 **Enlaces:**
                 - [Ver en Letterboxd](${letterboxdLink})
-                - [Ver en Stremio](${stremioLink})
-                - [Ver Tráiler](${movieTrailer})`,
+                [Ver en Stremio](${stremioLink})
+                (${movieTrailer})`,
                 files: [moviePoster]
             });
         } catch (error) {
