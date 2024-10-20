@@ -1,6 +1,6 @@
 // Importa los módulos necesarios
 const axios = require('axios');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 require('dotenv').config(); // Carga las variables de entorno desde el archivo .env
 
 // Crea una instancia del cliente de Discord
@@ -8,29 +8,20 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // Obtén las claves API de las variables de entorno
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
-const OMDB_API_KEY = process.env.OMDB_API_KEY; // Agrega la clave de OMDb
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
 // Almacena los géneros de películas en memoria
 let genresList = [];
 
-// Función para obtener información de una película de TMDB y OMDb
+// Función para obtener información de una película de TMDB
 async function getMovieInfo(title) {
     try {
         const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
-        
-        // Imprimir la respuesta para verificar la estructura
-        console.log('Respuesta de TMDB:', response.data);
-
         const movie = response.data.results[0];
 
         if (!movie) {
-            return null; // No se encontró la película
+            return null;
         }
-
-        // Obtener el ID de IMDb desde OMDb
-        const omdbResponse = await axios.get(`http://www.omdbapi.com/?t=${encodeURIComponent(movie.title)}&apikey=${OMDB_API_KEY}`);
-        const imdbID = omdbResponse.data.imdbID;
 
         const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
@@ -39,16 +30,16 @@ async function getMovieInfo(title) {
         return {
             title: movie.title,
             year: new Date(movie.release_date).getFullYear(),
-            genre: movie.genres ? movie.genres.map(genre => genre.name).join(', ') : 'No disponible', // Verifica si 'genres' existe
+            genre: movie.genres.map(genre => genre.name).join(', '),
             plot: movie.overview,
-            poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'No disponible',
+            poster: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
             imdbRating: movie.vote_average,
             directors: creditsResponse.data.crew.filter(member => member.job === 'Director').map(director => director.name).join(', '),
             trailer: trailers.length > 0 ? `https://www.youtube.com/watch?v=${trailers[0].key}` : 'No disponible',
-            imdb_id: imdbID // Guardar el ID de IMDb para el enlace de Stremio
+            imdb_id: movie.id // Usar el ID de TMDB para OMDb
         };
     } catch (error) {
-        console.error('Error al obtener la información de TMDB u OMDb:', error);
+        console.error('Error al obtener la información de TMDB:', error);
         return null;
     }
 }
@@ -64,21 +55,20 @@ function generateStremioLink(imdbID) {
     return `https://www.strem.io/s/movie/${imdbID.slice(2)}`; // Eliminar 'tt'
 }
 
-// Función para construir la estructura de respuesta
-function buildResponse(movieInfo) {
-    return {
-        content: `**${movieInfo.title}** (${movieInfo.year})
-        Género: ${movieInfo.genre}
-        Sinopsis: ${movieInfo.plot}
-        Director/a: ${movieInfo.directors}
-        Calificación en IMDb: ${movieInfo.imdbRating}
-        
-        **Enlaces:**
-        - Ver en Letterboxd: ${generateLetterboxdLink(movieInfo.title)}
-        - Ver en Stremio: ${generateStremioLink(movieInfo.imdb_id)}
-        - [Ver Tráiler en YouTube](${movieInfo.trailer})`, // Mantener el link del trailer como inserción
-        files: [movieInfo.poster]  // Enviar la carátula de la película
-    };
+// Función para construir la estructura de respuesta en embed
+function buildEmbedResponse(movieInfo) {
+    const embed = new EmbedBuilder()
+        .setColor(0x0099FF)
+        .setTitle(movieInfo.title)
+        .setDescription(`**Año:** ${movieInfo.year}\n**Género:** ${movieInfo.genre}\n**Sinopsis:** ${movieInfo.plot}\n**Directores:** ${movieInfo.directors}\n**Calificación en IMDb:** ${movieInfo.imdbRating}`)
+        .setImage(movieInfo.poster)
+        .addFields(
+            { name: 'Enlaces', value: `[Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})\n[Ver en Stremio](${generateStremioLink(movieInfo.imdb_id)})\n[Ver Tráiler en YouTube](${movieInfo.trailer})` }
+        )
+        .setTimestamp()
+        .setFooter({ text: '¡Disfruta de la película!' });
+
+    return embed;
 }
 
 // Función para cargar la lista de géneros al iniciar el bot
@@ -99,7 +89,7 @@ client.once('ready', async () => {
 
 // Cuando se envíe un mensaje en el servidor
 client.on('messageCreate', async message => {
-    if (message.author.bot) return;
+    if (message.author.bot) return; // Ignora los mensajes del bot
 
     // Comando para obtener información de una película
     if (message.content.startsWith('!info')) {
@@ -119,7 +109,8 @@ client.on('messageCreate', async message => {
                 return;
             }
 
-            message.channel.send(buildResponse(movieInfo));
+            const embed = buildEmbedResponse(movieInfo);
+            await message.channel.send({ embeds: [embed] });
         } catch (error) {
             console.error('Error al obtener la información de la película:', error);
             message.channel.send('Hubo un error al intentar obtener la información de la película.');
@@ -138,7 +129,8 @@ client.on('messageCreate', async message => {
                 return;
             }
 
-            message.channel.send(buildResponse(movieInfo));
+            const embed = buildEmbedResponse(movieInfo);
+            await message.channel.send({ embeds: [embed] });
         } catch (error) {
             console.error('Error al obtener una película aleatoria:', error);
             message.channel.send('Hubo un error al intentar obtener una película aleatoria.');
@@ -172,7 +164,8 @@ client.on('messageCreate', async message => {
                 return;
             }
 
-            message.channel.send(buildResponse(movieInfo));
+            const embed = buildEmbedResponse(movieInfo);
+            await message.channel.send({ embeds: [embed] });
         } catch (error) {
             console.error('Error al obtener una película aleatoria por género:', error);
             message.channel.send('Hubo un error al intentar obtener una película aleatoria por género.');
