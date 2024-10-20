@@ -53,20 +53,11 @@ async function loadGenres() {
     }
 }
 
-// Función para obtener información de una película de TMDB
+// Función para obtener información de una película
 async function getMovieInfo(title) {
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
-        console.log("Respuesta de TMDB:", response.data); // Agregar log para depuración
-        const movie = response.data.results[0];
-
-        if (!movie) {
-            console.log("No se encontró ninguna película.");
-            return null;
-        }
-
-        // Obtener más detalles de la película desde OMDb usando el imdbID
-        const omdbResponse = await axios.get(`http://www.omdbapi.com/?i=${movie.imdb_id}&apikey=${process.env.OMDB_API_KEY}`);
+        // Buscar la película en OMDb primero
+        const omdbResponse = await axios.get(`http://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${process.env.OMDB_API_KEY}`);
         const omdbMovie = omdbResponse.data;
 
         // Verificar la respuesta de OMDb
@@ -78,29 +69,37 @@ async function getMovieInfo(title) {
             return null; // O puedes devolver un objeto vacío o con datos predeterminados
         }
 
-        // Asegúrate de que el imdbID existe antes de continuar
-        let imdbID = omdbMovie.imdbID; // Cambié const a let
+        // Obtener el imdbID
+        const imdbID = omdbMovie.imdbID; // Aquí se obtiene el ID de IMDb
         if (!imdbID) {
             console.error('imdbID no encontrado en la respuesta de OMDb:', omdbMovie);
             return null;
         }
 
+        // Ahora que tenemos el imdbID, buscamos más detalles en TMDB
+        const tmdbResponse = await axios.get(`https://api.themoviedb.org/3/find/${imdbID}?api_key=${TMDB_API_KEY}&external_source=imdb_id`);
+        const movie = tmdbResponse.data.movie_results[0];
+
+        if (!movie) {
+            console.log("No se encontró ninguna película en TMDB con el imdbID proporcionado.");
+            return null;
+        }
+
+        // Obtener más detalles de la película desde TMDB
         const creditsResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const trailerResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/videos?api_key=${TMDB_API_KEY}`);
         const trailers = trailerResponse.data.results;
 
-        console.log("Géneros de la película:", movie.genre_ids); // Agregar log para depuración
-
-         // Aquí generamos el link de Stremio usando el imdbID de OMDb
-         const stremioLink = generateStremioLink(imdbID); // Generar el enlace de Stremio
+        // Generar el link de Stremio usando el imdbID
+        const stremioLink = generateStremioLink(imdbID); // Generar el enlace de Stremio
 
         return {
-            title: movie.title,
-            year: new Date(movie.release_date).getFullYear(),
+            title: omdbMovie.Title,
+            year: omdbMovie.Year,
             genre: movie.genre_ids && movie.genre_ids.length > 0 ? movie.genre_ids.map(id => getGenreNameById(id)).join(', ') : 'No disponible',
-            plot: movie.overview,
-            poster: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'No disponible',
-            imdbRating: movie.vote_average,
+            plot: omdbMovie.Plot,
+            poster: omdbMovie.Poster,
+            imdbRating: omdbMovie.imdbRating,
             directors: creditsResponse.data.crew.filter(member => member.job === 'Director').map(director => director.name).join(', '),
             trailer: trailers.length > 0 ? trailers[0].key : 'No disponible', // Guardar solo el key del tráiler
             imdb_id: imdbID || 'No disponible', // Asegúrate de que se asigna correctamente
@@ -138,7 +137,7 @@ function buildEmbedResponse(movieInfo) {
         .setDescription(`**Año:** ${movieInfo.year}\n**Género:** ${movieInfo.genre}\n**Sinopsis:** ${movieInfo.plot}\n**Directores:** ${movieInfo.directors}\n**Calificación en IMDb:** ${movieInfo.imdbRating}`)
         .setThumbnail(movieInfo.poster) // Añadir la carátula a la derecha como miniatura
         .addFields(
-            { name: 'Enlaces', value: `[Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})\n[Ver en Stremio](${generateStremioLink(movieInfo.imdb_id)})` }
+            { name: 'Enlaces', value: `[Ver en Letterboxd](${generateLetterboxdLink(movieInfo.title)})\n[Ver en Stremio](${movieInfo.stremioLink})` }
         )
         .setTimestamp()
         .setFooter({ text: `🎬 Tráiler: ${movieInfo.trailer ? `https://www.youtube.com/watch?v=${movieInfo.trailer}` : 'No disponible'}` }); // Añadir el tráiler en el footer
