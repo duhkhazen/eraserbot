@@ -59,6 +59,11 @@ async function getMovieInfo(title) {
         }
 
         const imdbID = omdbData.imdbID.slice(2); // Remueve el prefijo 'tt'
+
+        // Obtener el tráiler de TMDB
+        const videoResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movieInfo.id}/videos?api_key=${TMDB_API_KEY}`);
+        const trailer = videoResponse.data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube'); // Obtener el tráiler de YouTube si está disponible
+
         return {
             title: movieInfo.title,
             year: movieInfo.release_date.split('-')[0],
@@ -66,7 +71,7 @@ async function getMovieInfo(title) {
             plot: omdbData.Plot,
             poster: movieInfo.poster_path ? `https://image.tmdb.org/t/p/w500${movieInfo.poster_path}` : 'No disponible',
             imdbID,
-            trailer: omdbData.Trailer || 'No disponible', // Suponiendo que tienes este campo
+            trailer: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : 'No disponible', // Usar el link directo del tráiler desde TMDB
         };
     } catch (error) {
         console.error('Error al obtener la información de TMDB:', error);
@@ -102,7 +107,7 @@ async function recommendRandomMovie(message) {
         const letterboxdLink = generateLetterboxdLink(movieInfo.title);
         const stremioLink = generateStremioLink(movieInfo.imdbID);
         const moviePoster = movieInfo.poster || 'No disponible';
-        const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `https://www.youtube.com/results?search_query=${encodeURIComponent(movieInfo.title)}+trailer`;
+        const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `No hay tráiler disponible`;
 
         await message.channel.send({
             content: `**${movieInfo.title}** (${movieInfo.year})
@@ -138,7 +143,7 @@ async function recommendByGenre(message, genre) {
         const letterboxdLink = generateLetterboxdLink(movieInfo.title);
         const stremioLink = generateStremioLink(movieInfo.imdbID);
         const moviePoster = movieInfo.poster || 'No disponible';
-        const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `https://www.youtube.com/results?search_query=${encodeURIComponent(movieInfo.title)}+trailer`;
+        const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `No hay tráiler disponible`;
 
         await message.channel.send({
             content: `**${movieInfo.title}** (${movieInfo.year})
@@ -204,7 +209,7 @@ client.on('messageCreate', async message => {
             const letterboxdLink = generateLetterboxdLink(movieInfo.title);
             const stremioLink = generateStremioLink(movieInfo.imdbID);
             const moviePoster = movieInfo.poster || 'No disponible';
-            const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `https://www.youtube.com/results?search_query=${encodeURIComponent(movieInfo.title)}+trailer`;
+            const movieTrailer = movieInfo.trailer !== 'No disponible' ? movieInfo.trailer : `No hay tráiler disponible`;
 
             await message.channel.send({
                 content: `**${movieInfo.title}** (${movieInfo.year})
@@ -292,4 +297,3 @@ client.on('messageCreate', async message => {
 
 // Inicia el bot
 client.login(DISCORD_BOT_TOKEN);
-
