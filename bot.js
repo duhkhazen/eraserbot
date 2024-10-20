@@ -13,7 +13,7 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 // Función para obtener información de una película de OMDb
 async function getMovieInfo(title) {
     try {
-        const response = await axios.get(`http://www.omdbapi.com/?t=${title}&apikey=${OMDB_API_KEY}`);
+        const response = await axios.get(`http://www.omdbapi.com/?t=${title}&apikey=${OMDB_API_KEY}&language=es`);
         return response.data;
     } catch (error) {
         console.error('Error al obtener la información de OMDb:', error);
