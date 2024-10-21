@@ -13,9 +13,9 @@ const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 // Almacena los géneros de películas y la lista de seguimiento en memoria
 let genresList = [];
 let watchlist = [];
-let currentMovie = ''; // Para el juego de adivinanza
+let currentMovie = ''; // Variable para almacenar la película actual para el juego
 let scores = {}; // Para la puntuación del juego
-let isGameActive = false; // Controla el estado del juego
+let isGameActive = false; // Bandera para controlar si el juego está activo
 
 // Mapeo estático de los géneros
 const genreMapping = {
@@ -159,9 +159,8 @@ let isResponding = false;
 
 // Cuando se envíe un mensaje en el servidor
 client.on('messageCreate', async message => {
-    if (message.author.bot || isResponding) return; // Ignora los mensajes del bot o si ya está respondiendo
-
-    isResponding = true; // Establecer flag para evitar respuestas duplicadas
+    // Ignorar mensajes de bots
+    if (message.author.bot) return;
 
     // Manejar comandos
     if (message.content.startsWith('!info')) {
@@ -170,7 +169,6 @@ client.on('messageCreate', async message => {
 
         if (!movieTitle) {
             message.channel.send('Por favor, proporciona el título de una película. Ejemplo: !info Inception');
-            isResponding = false; // Restablecer flag después de responder
             return;
         }
 
@@ -179,7 +177,6 @@ client.on('messageCreate', async message => {
 
             if (!movieInfo) {
                 message.channel.send('No se encontró información de esa película.');
-                isResponding = false; // Restablecer flag después de responder
                 return;
             }
 
@@ -208,7 +205,6 @@ client.on('messageCreate', async message => {
 
             if (!movieInfo) {
                 message.channel.send('No se encontró información de una película aleatoria.');
-                isResponding = false; // Restablecer flag después de responder
                 return;
             }
 
@@ -227,7 +223,6 @@ client.on('messageCreate', async message => {
 
         if (!movieTitle) {
             message.channel.send('Por favor, proporciona el título de una película para agregar a la lista de seguimiento.');
-            isResponding = false; // Restablecer flag después de responder
             return;
         }
 
@@ -244,29 +239,55 @@ client.on('messageCreate', async message => {
         }
     }
 
-    // Comando para rankear películas (puedes expandir esta funcionalidad)
-    else if (message.content.startsWith('!rank')) {
-        // Lógica de rankeo de películas aquí (opcional)
-    }
-
     // Comando para iniciar el juego de adivinanza
     else if (message.content.startsWith('!fun')) {
         if (isGameActive) {
-            message.channel.send('El juego ya está en progreso. ¡Adivina la película!');
-        } else {
-            currentMovie = '';
-            scores = {};
-            isGameActive = true;
+            message.channel.send('¡Ya hay un juego en curso! Adivina la película.');
+            return;
+        }
 
+        isGameActive = true; // Activa el juego
+        try {
             const randomResponse = await axios.get(`https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}`);
-            const movies = randomResponse.data.results;
-            const randomMovie = movies[Math.floor(Math.random() * movies.length)];
-            currentMovie = randomMovie.title;
+            const randomMovie = randomResponse.data.results[Math.floor(Math.random() * randomResponse.data.results.length)];
+            const movieInfo = await getMovieInfo(randomMovie.title);
+            currentMovie = movieInfo.title; // Guarda el título de la película actual
 
-            message.channel.send(`¡Adivina la película! Aquí tienes una sinopsis: ${randomMovie.overview}`);
+            // Envía la sinopsis y espera la respuesta
+            message.channel.send(`🤔 Adivina la película: ${movieInfo.plot}`);
+        } catch (error) {
+            console.error('Error al obtener una película aleatoria:', error);
+            message.channel.send('Hubo un error al intentar iniciar el juego.');
+            isGameActive = false; // Restablece el estado del juego en caso de error
         }
     }
 
+    // Comando para adivinar la película
+    if (isGameActive) {
+        if (message.content.toLowerCase() === currentMovie.toLowerCase()) {
+            // Respuesta correcta
+            if (!scores[message.author.id]) {
+                scores[message.author.id] = 0; // Inicializa el puntaje si el usuario no tiene
+            }
+            scores[message.author.id] += 1; // Aumenta el puntaje
+            message.channel.send(`🎉 ¡Correcto, ${message.author.username}! La película es "${currentMovie}".`);
+            isGameActive = false; // Desactiva el juego después de adivinar correctamente
+        } else {
+            // Respuesta incorrecta
+            message.channel.send(`❌ Incorrecto, ${message.author.username}. Sigue intentando.`);
+        }
+    }
+
+    // Si se quiere finalizar el juego (opcional)
+    if (message.content.startsWith('!endfun')) {
+        isGameActive = false; // Desactiva el juego
+        const leaderboard = Object.entries(scores)
+            .map(([userId, score]) => `<@${userId}>: ${score}`)
+            .join('\n') || 'No hay jugadores aún.';
+        message.channel.send(`🏆 Tabla de puntos:\n${leaderboard}`);
+    }
+
+    // Flag para evitar respuestas duplicadas
     isResponding = false; // Restablecer flag después de manejar el mensaje
 });
 
